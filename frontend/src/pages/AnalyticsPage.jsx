@@ -34,8 +34,16 @@ export default function AnalyticsPage() {
   const [timeframe, setTimeframe] = useState('all_time');
   const [loading, setLoading] = useState(true);
 
+  const rangeParamMap = {
+    '7_days': '7d',
+    '30_days': '30d',
+    '90_days': '90d',
+    'all_time': 'all'
+  };
+
   useEffect(() => {
-    api.getAnalytics()
+    setLoading(true);
+    api.getAnalytics(rangeParamMap[timeframe] || 'all')
       .then((data) => setAnalytics(data))
       .catch((err) => addToast(err.message, 'error'))
       .finally(() => setLoading(false));
@@ -59,6 +67,7 @@ export default function AnalyticsPage() {
         {/* Date Filter Tabs */}
         <div className="flex rounded-xl bg-[#151D19] p-1 border border-[#1D2B24] self-start sm:self-auto text-xs">
           {[
+            { id: '7_days', label: 'Last 7 Days' },
             { id: '30_days', label: 'Last 30 Days' },
             { id: '90_days', label: 'Last 90 Days' },
             { id: 'all_time', label: 'All Time' },

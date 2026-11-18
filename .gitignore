@@ -1,0 +1,47 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+*.whl
+*.so
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# ---- Node / Frontend ----
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# ---- IDE / Editor ----
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ---- OS ----
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ---- Environment & Secrets ----
+.env
+.env.local
+.env.production
+
+# ---- Project-specific ----
+backend/uploads/*
+!backend/uploads/samples/
+*.sqlite
+*.db
+billwise.db

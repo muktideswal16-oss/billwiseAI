@@ -131,6 +131,7 @@ export default function ExtractionPage() {
           description: 'Description',
           quantity: 1,
           unit_price: 0,
+          discount: 0,
           tax: 0,
           line_total: 0,
           confidence: 1.0
@@ -403,7 +404,7 @@ export default function ExtractionPage() {
                     className="w-full bg-[#151D19] border border-[#1D2B24] rounded-lg px-2.5 py-1 text-[11px] text-[#929F98]"
                   />
 
-                  <div className="grid grid-cols-4 gap-2 text-xs pt-1">
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs pt-1">
                     <div>
                       <span className="text-[10px] text-[#929F98] uppercase">Qty</span>
                       <input
@@ -421,6 +422,16 @@ export default function ExtractionPage() {
                         step="0.01"
                         value={item.unit_price}
                         onChange={(e) => handleItemChange(idx, 'unit_price', parseFloat(e.target.value) || 0)}
+                        className="w-full bg-[#151D19] border border-[#1D2B24] rounded px-2 py-1 text-[#F4F7F5]"
+                      />
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-[#929F98] uppercase">Discount</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={item.discount ?? 0}
+                        onChange={(e) => handleItemChange(idx, 'discount', parseFloat(e.target.value) || 0)}
                         className="w-full bg-[#151D19] border border-[#1D2B24] rounded px-2 py-1 text-[#F4F7F5]"
                       />
                     </div>

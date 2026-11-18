@@ -48,33 +48,46 @@ export default function ExportPage() {
     }
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (selectedIds.length === 0) {
       addToast('Please select at least one document to export', 'warning');
       return;
     }
 
     const exportUrl = api.getExportUrl(format, onlyApproved, selectedIds);
-    // Create an invisible anchor to initiate native browser download
-    const link = document.createElement('a');
-    link.href = exportUrl;
-    link.setAttribute('download', `billwise_export_${Date.now()}.${format === 'excel' ? 'xlsx' : 'csv'}`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      addToast(`Generating ${format.toUpperCase()} export...`, 'info');
+      const token = localStorage.getItem('billwise_token');
+      const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+      const res = await fetch(exportUrl, { headers });
+      if (!res.ok) {
+        throw new Error('Export generation failed');
+      }
+      const blob = await res.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.setAttribute('download', `billwise_export_${Date.now()}.${format === 'excel' ? 'xlsx' : 'csv'}`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
 
-    // Confetti celebration
-    confetti({
-      particleCount: 70,
-      spread: 70,
-      origin: { y: 0.6 },
-      colors: ['#20D69A', '#8AF0C7', '#ffffff']
-    });
+      // Confetti celebration
+      confetti({
+        particleCount: 70,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#20D69A', '#8AF0C7', '#ffffff']
+      });
 
-    addToast(
-      `Export generated! Downloaded ${selectedIds.length} records in ${format.toUpperCase()} format.`,
-      'success'
-    );
+      addToast(
+        `Export generated! Downloaded ${selectedIds.length} records in ${format.toUpperCase()} format.`,
+        'success'
+      );
+    } catch (err) {
+      addToast(`Export failed: ${err.message}`, 'error');
+    }
   };
 
   return (

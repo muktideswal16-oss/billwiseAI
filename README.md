@@ -1,45 +1,50 @@
 # BillWise AI — Intelligent Document Processing Platform
 
-> **Turn invoices, receipts, and purchase orders into clean, checked business records.**
+> **Turn invoices, receipts, and purchase orders into clean, checked, and export-ready business records.**
 
-A production-style, intelligent document processing web platform designed for small businesses, shopkeepers, retail operators, and accounting teams who manually maintain invoice records.
+BillWise AI is a full-stack, enterprise-grade Intelligent Document Processing (IDP) platform designed for small business owners, retail operators, shopkeepers, and accounting teams who manually enter financial documents into spreadsheets.
 
 Built for the Hackathon theme: **AI, Automation & Intelligent Systems**  
 Problem Statement: **Intelligent Document Processing for Small Businesses**
 
 ---
 
-## 1. Core Architecture & Philosophy
+## 1. Product Vision & Core Architecture
 
-BillWise AI is built around three core pillars:
+Small businesses spend hours each week manually typing invoice details into spreadsheets. Manual data entry introduces three critical problems:
+1. **Arithmetic Errors**: Incorrect subtotals, wrong tax rates, and unbalanced grand totals.
+2. **Missing Metadata**: Incomplete invoice identifiers, unparsed dates, and missing tax IDs.
+3. **Duplicate Invoices**: Paying the same invoice twice due to uncoordinated submissions.
 
-1. **Intelligence**: Deep OCR text rastering and NLP field extraction that identifies vendors, dates, identifiers, line-item tables, and totals with field-level confidence scoring.
-2. **Accuracy**: Rule-based validation engine checking mathematical formulas (`Subtotal + Tax - Discount = Grand Total`), line-item reconciliations, timeline sanity, and duplicate detection.
-3. **Control**: Human-in-the-loop review. Records remain pending until a human explicitly reviews side-by-side previews, edits any discrepancy, and approves them prior to export.
+BillWise AI communicates three core values:
+- **Intelligence**: Native OCR text rastering and structured field extraction that identifies vendors, dates, line items, and totals with field-level confidence scoring.
+- **Accuracy**: Python `Decimal` financial validation checking formulas (`Subtotal + Tax - Discount = Grand Total`), line-item reconciliations, timeline sanity, and duplicate detection.
+- **Control**: Human-in-the-loop review. Records require explicit human sign-off before being finalized and exported to formatted Excel and CSV files.
 
 ---
 
 ## 2. Technology Stack
 
 ### Frontend
-- **React.js 19** with **Vite**
-- **Tailwind CSS v4** (Custom Emerald Fintech SaaS Theme)
-- **Lucide React** for professional interface icons
-- **Recharts** for monthly throughput and vendor spending analytics
-- **React Router v7** for multi-page workspace routing
-- **Canvas-Confetti** for celebration micro-interactions
+- **React.js 19** with **Vite 8**
+- **Tailwind CSS v4** (Custom Emerald Fintech SaaS Design System)
+- **Lucide React** for enterprise interface icons
+- **Recharts** for monthly throughput and vendor spending data visualizations
+- **React Router v7** with authenticated `ProtectedRoute` route guards
+- **Canvas-Confetti** for approval celebration micro-interactions
 
 ### Backend
-- **Python 3.14** with **FastAPI**
-- **SQLAlchemy ORM** with **SQLite** (fully PostgreSQL compatible)
+- **Python 3.14 / 3.10+** with **FastAPI**
+- **Bcrypt & PyJWT** for password hashing and signed RFC 7519 JWT access tokens
+- **SQLAlchemy ORM** with **SQLite** (compatible with PostgreSQL)
 - **Pandas** for tabular dataset transformation and flat CSV generation
-- **OpenPyXL** for formatted, styled Excel (`.xlsx`) workbooks with auto-fit columns
-- **Pillow (PIL)** for contrast enhancement and image binarization
-- **Tesseract OCR / PyPDF2** for native text recognition with heuristic fallbacks
+- **OpenPyXL** for formatted, styled Excel (`.xlsx`) workbooks with emerald headers
+- **Pillow (PIL)** for contrast enhancement, noise sharpening, and image binarization
+- **Tesseract OCR & PyPDF2** for native text recognition with structured pattern fallbacks
 
 ---
 
-## 3. Design System & Fintech SaaS Theme
+## 3. Design System — Emerald Fintech SaaS
 
 - **Main Background**: `#080B0A`
 - **Secondary Background**: `#101613`
@@ -49,59 +54,116 @@ BillWise AI is built around three core pillars:
 - **Main Text**: `#F4F7F5`
 - **Muted Text**: `#929F98`
 - **Warning**: `#F4B942`
-- **Error / Discrepancy**: `#FF646D`
+- **Error**: `#FF646D`
 - **Success**: `#20D69A`
 
 ---
 
-## 4. 10-Step Hackathon Live Demonstration Walkthrough
+## 4. Security & Data Integrity Features
 
-Judges can complete a full end-to-end evaluation in **3–5 minutes**:
-
-1. **Landing Page (`/`)**: Review the hero, animated scanning laser effect on the live invoice preview, and the 6-stage automated pipeline.
-2. **Dashboard Overview (`/dashboard`)**: Explore real-time metrics, throughput charts, document classification donut, and the recent ingestion queue.
-3. **Document Ingestion (`/upload`)**: Click one of the 3 hackathon presets:
-   - **Scenario 1 (Clean Valid)**: *Apex Cloud Solutions* (3 items, 10% tax, balanced total of $2,595.00).
-   - **Scenario 2 (Calculation Mismatch)**: *Vanguard Office Supplies* (item sum $850.00 vs recorded subtotal $950.00).
-   - **Scenario 3 (Duplicate Invoice)**: *Apex Cloud Duplicate* (matches invoice #INV-2024-0891).
-4. **Processing Pipeline Animation**: Observe the 6-stage animated progress bar: Ingestion → Preprocessing → OCR → Extraction → Validation → Ready for Review.
-5. **AI Extraction Centre (`/extraction/:id`)**: Inspect the split-screen view: document preview on left, organized editable fields with traffic-light confidence badges on right.
-6. **Error Correction**: Edit any mismatched field directly. Notice confidence automatically updates to 100% (Human Verified).
-7. **Validation Centre (`/validation/:id`)**: Review automated formula verification, expected vs actual discrepancy chips, and duplicate collision warnings.
-8. **Duplicate Detection Centre (`/duplicates`)**: Side-by-side comparison of Document A vs Document B with matching reasons (identical invoice number, vendor, and amount). Option to mark as legitimate or confirm duplicate.
-9. **Human Review & Approval (`/review/:id`)**: Add audit remarks, click **"Approve & Finalize Record"**, and enjoy the confetti celebration!
-10. **Export Centre (`/export`)**: Select approved records and download a real generated Excel (`.xlsx`) or CSV file.
+1. **Bcrypt Password Encryption**: Salted bcrypt hashing with 12 rounds of key derivation. Minimum 8-character password enforcement.
+2. **Cryptographic JWT Tokens**: Signed tokens using HS256 with user identity claims and expiration checks.
+3. **User-Level Data Isolation**: Authenticated requests are scoped to the active token's `user_id`. One business cannot view, edit, approve, or export another business's invoices.
+4. **Spreadsheet Formula Injection Defense**: All exported cells in CSV and Excel are sanitized against DDE/formula attacks by prefixing strings starting with `=`, `+`, `-`, `@`, `\t`, or `\r` with a single apostrophe (`'`).
+5. **Upload Boundary Defense**: Strict 15 MB payload streaming limit, whitelisted extensions (`.pdf`, `.png`, `.jpg`, `.jpeg`), and rejection of dangerous SVG/executable payloads.
+6. **Decimal Precision**: Financial calculations use Python's `decimal.Decimal` with 2-decimal half-up rounding, eliminating floating-point arithmetic errors.
 
 ---
 
-## 5. Quick Start & Execution Instructions
+## 5. Quick Start (Windows PowerShell)
 
 ### Prerequisites
-- Node.js (v18+)
-- Python (v3.10+)
+- **Node.js** (v18 or higher)
+- **Python** (v3.10 or higher)
 
-### Running the Backend
-```bash
-# From workspace root
-python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
+### Step 1: Clone & Configure Environment
+```powershell
+# Navigate to repository root
+cd c:\Users\varun\OneDrive\Desktop\billwiseAI
+
+# Copy environment template
+Copy-Item .env.example .env
 ```
-Backend runs at: `http://127.0.0.1:8000`  
-Interactive OpenAPI Docs: `http://127.0.0.1:8000/docs`
 
-### Running the Frontend
-```bash
-# Navigate to frontend folder
+### Step 2: Install Dependencies
+```powershell
+# Install backend Python dependencies
+python -m pip install -r requirements.txt
+
+# Install frontend Node dependencies
 cd frontend
 npm install
+cd ..
+```
+
+### Step 3: Run the Application
+
+Open two PowerShell terminal windows:
+
+**Terminal 1 — Backend API Server:**
+```powershell
+python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
+```
+- API Base URL: `http://127.0.0.1:8000`
+- Interactive OpenAPI Documentation: `http://127.0.0.1:8000/docs`
+
+**Terminal 2 — Frontend Dev Server:**
+```powershell
+cd frontend
 npm run dev -- --host 127.0.0.1 --port 5173
 ```
-Frontend runs at: `http://127.0.0.1:5173`
+- Web Application: `http://127.0.0.1:5173`
 
 ---
 
-## 6. OCR vs Demo Mode Transparency
+## 6. Running Automated Tests
 
-To maintain technical integrity without fake claims:
-- **Real OCR**: When Tesseract OCR binary or text-bearing PDFs are available on the host machine, text recognition is performed directly using `pytesseract` and `PyPDF2` with image contrast preprocessing.
-- **Deterministic Demo Presets**: When evaluating without external API keys or when clicking the 3 hackathon preset buttons, deterministic sample extractions are provided. Every extraction clearly displays its engine tag (`AI_OCR_ENGINE`, `TESSERACT_OCR`, or `DEMO_DETERMINISTIC`).
+Execute the comprehensive 26-module test suite covering security, OCR accuracy, duplicate resolution, financial decimals, and export generation:
 
+```powershell
+python backend/test_suite.py
+```
+
+Expected output:
+```text
+======================================================================
+   BILLWISE AI — COMPREHENSIVE AUTOMATED QA TEST SUITE
+======================================================================
+✓ [1/26] User Registration: Success
+✓ [2/26] Valid Login: Authenticated and issued genuine signed JWT
+...
+✓ [26/26] Settings Persistence: GET/PUT /api/settings persisted to database
+======================================================================
+🎉 ALL 26/26 COMPREHENSIVE QA TEST MODULES PASSED SUCCESSFULLY!
+======================================================================
+```
+
+To run the frontend production build audit:
+```powershell
+cd frontend
+npm run build
+```
+
+---
+
+## 7. 3-Minute Hackathon Live Demonstration Flow
+
+For live judging and evaluations:
+
+1. **Instant Demo Login**: Go to `http://localhost:5173/login` and click **"Launch Instant Demo Mode"**.
+2. **Executive Dashboard**: Inspect live metrics, throughput charts, and vendor breakdowns at `/dashboard`.
+3. **Scenario 1 (Clean Valid)**: In `/upload`, load **"Clean Valid Invoice"**. View split-screen extraction at `/extraction/:id`, click **"Run Automated Validation"** (all 7 checks pass), and approve the document.
+4. **Scenario 2 (Calculation Error)**: In `/upload`, load **"Calculation Error Sample"**. Notice the math error ($850 item sum vs $950 subtotal) and blocked approval. Correct the subtotal to 850, and watch the status flip to PASSED.
+5. **Scenario 3 (Duplicate Invoice)**: In `/upload`, load **"Duplicate Invoice Sample"**. Inspect the collision in `/duplicates` and resolve it by clicking **"Mark as Legitimate"**.
+6. **Export**: Go to `/export`, choose Excel (`.xlsx`) or CSV, and download the verified accounting records.
+
+See [DEMO_GUIDE.md](file:///c:/Users/varun/OneDrive/Desktop/billwiseAI/DEMO_GUIDE.md) for the exact word-for-word presentation script.
+
+---
+
+## 8. Documentation Index
+
+- [QA_REPORT.md](file:///c:/Users/varun/OneDrive/Desktop/billwiseAI/QA_REPORT.md) — Comprehensive QA audit and defect resolution breakdown
+- [ARCHITECTURE.md](file:///c:/Users/varun/OneDrive/Desktop/billwiseAI/ARCHITECTURE.md) — System architecture, pipeline diagrams, and entity-relationship specifications
+- [DEMO_GUIDE.md](file:///c:/Users/varun/OneDrive/Desktop/billwiseAI/DEMO_GUIDE.md) — Step-by-step 3–5 minute presentation guide for hackathon judges
+- [.env.example](file:///c:/Users/varun/OneDrive/Desktop/billwiseAI/.env.example) — Safe environment variable template

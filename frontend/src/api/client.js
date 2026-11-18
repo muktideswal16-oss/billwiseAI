@@ -4,6 +4,12 @@ export async function request(endpoint, options = {}) {
   const url = `${API_BASE}${endpoint}`;
   const headers = options.headers || {};
 
+  // Attach authenticated Bearer token from localStorage
+  const token = localStorage.getItem('billwise_token');
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   if (!(options.body instanceof FormData)) {
     headers['Content-Type'] = 'application/json';
   }
@@ -97,7 +103,10 @@ export const api = {
     }),
 
   // Duplicates
-  getDuplicates: () => request('/duplicates'),
+  getDuplicates: (statusFilter = null) => {
+    const query = statusFilter ? `?status_filter=${statusFilter}` : '';
+    return request(`/duplicates${query}`);
+  },
   resolveDuplicate: (matchId, resolution, notes = '') => 
     request(`/duplicates/${matchId}/resolve`, {
       method: 'POST',
@@ -105,7 +114,14 @@ export const api = {
     }),
 
   // Analytics
-  getAnalytics: () => request('/analytics'),
+  getAnalytics: (range = 'all') => request(`/analytics?range=${range}`),
+
+  // Settings
+  getSettings: () => request('/settings'),
+  updateSettings: (data) => request('/settings', {
+    method: 'PUT',
+    body: JSON.stringify(data)
+  }),
 
   // Exports
   getExportUrl: (type, onlyApproved = true, docIds = null) => {
@@ -120,4 +136,3 @@ export const api = {
   // Reset Demo
   resetDemo: () => request('/demo/reset', { method: 'POST' })
 };
-

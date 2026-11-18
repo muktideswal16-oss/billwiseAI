@@ -32,16 +32,44 @@ export default function SettingsPage() {
     default_export_format: 'excel'
   });
 
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [resetting, setResetting] = useState(false);
 
-  const handleSave = (e) => {
+  React.useEffect(() => {
+    api.getSettings()
+      .then((data) => {
+        if (data) {
+          setProfile({
+            name: data.name || user?.name || 'Alex Rivera',
+            email: user?.email || 'demo@billwise.ai',
+            business_name: data.business_name || 'Nova Retail Logistics',
+            tax_id: data.tax_id || 'US-EIN-94-2819034',
+            currency: data.currency || 'USD',
+            ocr_engine: data.ocr_engine || 'HYBRID_AI',
+            confidence_threshold: data.confidence_threshold || 85,
+            auto_validate: data.auto_validate ?? true,
+            default_export_format: data.default_export_format || 'excel'
+          });
+        }
+      })
+      .catch((err) => {
+        console.warn('Could not load settings from server, using local defaults:', err);
+      })
+      .finally(() => setLoading(false));
+  }, [user]);
+
+  const handleSave = async (e) => {
     e.preventDefault();
     setSaving(true);
-    setTimeout(() => {
+    try {
+      await api.updateSettings(profile);
+      addToast('Preferences saved and persisted successfully', 'success');
+    } catch (err) {
+      addToast(`Failed to persist settings: ${err.message}`, 'error');
+    } finally {
       setSaving(false);
-      addToast('Preferences saved successfully', 'success');
-    }, 400);
+    }
   };
 
   const handleResetDemo = async () => {

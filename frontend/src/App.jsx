@@ -23,6 +23,25 @@ import SettingsPage from './pages/SettingsPage';
 
 import { api } from './api/client';
 
+function ProtectedRoute({ children }) {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#080B0A] flex flex-col items-center justify-center gap-3">
+        <div className="w-9 h-9 border-2 border-[#20D69A] border-t-transparent rounded-full animate-spin"></div>
+        <span className="text-xs text-[#929F98]">Verifying authenticated session...</span>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return children;
+}
+
 function AppLayout({ children }) {
   const [duplicateCount, setDuplicateCount] = useState(0);
   const [issuesCount, setIssuesCount] = useState(0);
@@ -73,101 +92,125 @@ export default function App() {
             <Route path="/login" element={<AuthPage initialMode="login" />} />
             <Route path="/register" element={<AuthPage initialMode="register" />} />
 
-            {/* Dashboard Workspace Routes */}
+            {/* Protected Workspace Routes */}
             <Route
               path="/dashboard"
               element={
-                <AppLayout>
-                  <DashboardPage />
-                </AppLayout>
+                <ProtectedRoute>
+                  <AppLayout>
+                    <DashboardPage />
+                  </AppLayout>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/upload"
               element={
-                <AppLayout>
-                  <UploadPage />
-                </AppLayout>
+                <ProtectedRoute>
+                  <AppLayout>
+                    <UploadPage />
+                  </AppLayout>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/documents"
               element={
-                <AppLayout>
-                  <DocumentListPage />
-                </AppLayout>
+                <ProtectedRoute>
+                  <AppLayout>
+                    <DocumentListPage />
+                  </AppLayout>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/extraction"
               element={
-                <AppLayout>
-                  <ExtractionPage />
-                </AppLayout>
+                <ProtectedRoute>
+                  <AppLayout>
+                    <ExtractionPage />
+                  </AppLayout>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/extraction/:id"
               element={
-                <AppLayout>
-                  <ExtractionPage />
-                </AppLayout>
+                <ProtectedRoute>
+                  <AppLayout>
+                    <ExtractionPage />
+                  </AppLayout>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/validation"
               element={
-                <AppLayout>
-                  <ValidationPage />
-                </AppLayout>
+                <ProtectedRoute>
+                  <AppLayout>
+                    <ValidationPage />
+                  </AppLayout>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/validation/:id"
               element={
-                <AppLayout>
-                  <ValidationPage />
-                </AppLayout>
+                <ProtectedRoute>
+                  <AppLayout>
+                    <ValidationPage />
+                  </AppLayout>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/review/:id"
               element={
-                <AppLayout>
-                  <ReviewPage />
-                </AppLayout>
+                <ProtectedRoute>
+                  <AppLayout>
+                    <ReviewPage />
+                  </AppLayout>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/duplicates"
               element={
-                <AppLayout>
-                  <DuplicatePage />
-                </AppLayout>
+                <ProtectedRoute>
+                  <AppLayout>
+                    <DuplicatePage />
+                  </AppLayout>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/analytics"
               element={
-                <AppLayout>
-                  <AnalyticsPage />
-                </AppLayout>
+                <ProtectedRoute>
+                  <AppLayout>
+                    <AnalyticsPage />
+                  </AppLayout>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/export"
               element={
-                <AppLayout>
-                  <ExportPage />
-                </AppLayout>
+                <ProtectedRoute>
+                  <AppLayout>
+                    <ExportPage />
+                  </AppLayout>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/settings"
               element={
-                <AppLayout>
-                  <SettingsPage />
-                </AppLayout>
+                <ProtectedRoute>
+                  <AppLayout>
+                    <SettingsPage />
+                  </AppLayout>
+                </ProtectedRoute>
               }
             />
 

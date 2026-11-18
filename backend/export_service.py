@@ -6,14 +6,28 @@ import pandas as pd
 from sqlalchemy.orm import Session
 from .models import Document, ExtractedInvoice, InvoiceItem
 
+
+def sanitize_for_spreadsheet(val):
+    """
+    Prevents spreadsheet formula injection (CSV/Excel DDE injection attacks).
+    Prepends a single quote if a string begins with dangerous formula characters (=, +, -, @).
+    """
+    if isinstance(val, str) and len(val) > 0:
+        if val[0] in ('=', '+', '-', '@', '\t', '\r'):
+            return f"'{val}"
+    return val
+
+
 def generate_export_dataframe(
     db: Session,
     document_ids: Optional[List[int]] = None,
-    only_approved: bool = True
+    only_approved: bool = True,
+    user_id: Optional[int] = None
 ) -> pd.DataFrame:
     """
     Builds a flattened tabular DataFrame ready for CSV/Excel export.
     Joins Document, ExtractedInvoice, and InvoiceItem.
+    Enforces user data isolation and spreadsheet security.
     """
     query = db.query(Document).join(ExtractedInvoice, Document.id == ExtractedInvoice.document_id)
 
@@ -22,6 +36,9 @@ def generate_export_dataframe(
 
     if document_ids:
         query = query.filter(Document.id.in_(document_ids))
+
+    if user_id is not None:
+        query = query.filter(Document.user_id == user_id)
 
     docs = query.all()
 
@@ -36,22 +53,23 @@ def generate_export_dataframe(
             for item in items:
                 rows.append({
                     "Document ID": doc.id,
-                    "Filename": doc.filename,
-                    "Document Type": doc.document_type,
-                    "Vendor Name": ext.vendor_name or "N/A",
-                    "Invoice Number": ext.invoice_number or "N/A",
+                    "Filename": sanitize_for_spreadsheet(doc.filename),
+                    "Document Type": sanitize_for_spreadsheet(doc.document_type),
+                    "Vendor Name": sanitize_for_spreadsheet(ext.vendor_name or "N/A"),
+                    "Invoice Number": sanitize_for_spreadsheet(ext.invoice_number or "N/A"),
                     "Invoice Date": ext.invoice_date or "N/A",
                     "Due Date": ext.due_date or "N/A",
-                    "Purchase Order": ext.purchase_order_number or "N/A",
-                    "Item Name": item.item_name,
-                    "Item Description": item.description or "",
+                    "Purchase Order": sanitize_for_spreadsheet(ext.purchase_order_number or "N/A"),
+                    "Item Name": sanitize_for_spreadsheet(item.item_name),
+                    "Item Description": sanitize_for_spreadsheet(item.description or ""),
                     "Quantity": item.quantity,
                     "Unit Price": item.unit_price,
+                    "Item Discount": getattr(item, 'discount', 0.0) or 0.0,
                     "Item Tax": item.tax,
                     "Line Total": item.line_total,
                     "Subtotal": ext.subtotal,
                     "Invoice Tax Total": ext.tax_amount,
-                    "Discount": ext.discount,
+                    "Invoice Discount": ext.discount,
                     "Grand Total": ext.grand_total,
                     "Currency": ext.currency,
                     "Approval Status": doc.approval_status,
@@ -62,22 +80,23 @@ def generate_export_dataframe(
         else:
             rows.append({
                 "Document ID": doc.id,
-                "Filename": doc.filename,
-                "Document Type": doc.document_type,
-                "Vendor Name": ext.vendor_name or "N/A",
-                "Invoice Number": ext.invoice_number or "N/A",
+                "Filename": sanitize_for_spreadsheet(doc.filename),
+                "Document Type": sanitize_for_spreadsheet(doc.document_type),
+                "Vendor Name": sanitize_for_spreadsheet(ext.vendor_name or "N/A"),
+                "Invoice Number": sanitize_for_spreadsheet(ext.invoice_number or "N/A"),
                 "Invoice Date": ext.invoice_date or "N/A",
                 "Due Date": ext.due_date or "N/A",
-                "Purchase Order": ext.purchase_order_number or "N/A",
+                "Purchase Order": sanitize_for_spreadsheet(ext.purchase_order_number or "N/A"),
                 "Item Name": "Summary Entry",
                 "Item Description": "Consolidated record",
                 "Quantity": 1.0,
                 "Unit Price": ext.subtotal,
+                "Item Discount": ext.discount,
                 "Item Tax": ext.tax_amount,
                 "Line Total": ext.subtotal,
                 "Subtotal": ext.subtotal,
                 "Invoice Tax Total": ext.tax_amount,
-                "Discount": ext.discount,
+                "Invoice Discount": ext.discount,
                 "Grand Total": ext.grand_total,
                 "Currency": ext.currency,
                 "Approval Status": doc.approval_status,
@@ -86,21 +105,22 @@ def generate_export_dataframe(
                 "Processed At": doc.upload_date.strftime("%Y-%m-%d %H:%M") if doc.upload_date else ""
             })
 
+    columns = [
+        "Document ID", "Filename", "Document Type", "Vendor Name", "Invoice Number",
+        "Invoice Date", "Due Date", "Purchase Order", "Item Name", "Item Description",
+        "Quantity", "Unit Price", "Item Discount", "Item Tax", "Line Total", "Subtotal",
+        "Invoice Tax Total", "Invoice Discount", "Grand Total", "Currency", "Approval Status",
+        "Confidence Score", "Extraction Method", "Processed At"
+    ]
+
     if not rows:
-        # Return empty dataframe with standard columns
-        return pd.DataFrame(columns=[
-            "Document ID", "Filename", "Document Type", "Vendor Name", "Invoice Number",
-            "Invoice Date", "Due Date", "Purchase Order", "Item Name", "Item Description",
-            "Quantity", "Unit Price", "Item Tax", "Line Total", "Subtotal", "Invoice Tax Total",
-            "Discount", "Grand Total", "Currency", "Approval Status", "Confidence Score",
-            "Extraction Method", "Processed At"
-        ])
+        return pd.DataFrame(columns=columns)
 
     return pd.DataFrame(rows)
 
 
 def export_to_csv(df: pd.DataFrame) -> io.BytesIO:
-    """Exports DataFrame to in-memory CSV file buffer."""
+    """Exports DataFrame to in-memory CSV file buffer with UTF-8 BOM."""
     buf = io.BytesIO()
     df.to_csv(buf, index=False, encoding='utf-8-sig')
     buf.seek(0)
@@ -110,7 +130,7 @@ def export_to_csv(df: pd.DataFrame) -> io.BytesIO:
 def export_to_excel(df: pd.DataFrame) -> io.BytesIO:
     """Exports DataFrame to styled Excel (.xlsx) buffer with professional styling."""
     buf = io.BytesIO()
-    
+
     with pd.ExcelWriter(buf, engine='openpyxl') as writer:
         df.to_excel(writer, sheet_name="BillWise Records", index=False)
         workbook = writer.book
@@ -148,11 +168,10 @@ def export_to_excel(df: pd.DataFrame) -> io.BytesIO:
                     if len(val_str) > max_len:
                         max_len = len(val_str)
                 worksheet.column_dimensions[col_letter].width = min(max(max_len + 3, 12), 40)
-                
+
             worksheet.row_dimensions[1].height = 28
         except Exception as e:
             print(f"Excel styling error: {e}")
 
     buf.seek(0)
     return buf
-

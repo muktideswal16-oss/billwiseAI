@@ -71,7 +71,7 @@ def extract_raw_text(file_path: str, mime_type: str) -> Tuple[str, str]:
                     if extracted:
                         pdf_text += extracted + "\n"
                 if len(pdf_text.strip()) > 20:
-                    return pdf_text.strip(), "PYPDF_TEXT"
+                    return pdf_text.strip(), "PDF_TEXT_EXTRACTION"
             except Exception as e:
                 print(f"PyPDF2 error: {e}")
 
@@ -422,23 +422,30 @@ def parse_text_with_nlp_rules(raw_text: str) -> Dict[str, Any]:
     extracted["field_confidences"]["currency"] = 0.99
 
     # 5. Financial figures
-    # Look for Grand Total / Total
-    total_match = re.search(r'(?:grand\s+total|total\s+due|amount\s+due)[\s/:\n\w\(\)]*[■\$€£₹\s]*([0-9,]+\.\d{2})', raw_text, re.IGNORECASE)
+    # Look for Grand Total / Total without consuming leading digits
+    total_match = re.search(r'(?:grand\s+total|total\s+due|amount\s+due|total\s+amount|invoice\s+total)[^\d\n\r]*?(\d[\d,]*\.\d{2})', raw_text, re.IGNORECASE)
     if total_match:
         val = float(total_match.group(1).replace(',', ''))
         extracted["grand_total"] = val
         extracted["field_confidences"]["grand_total"] = 0.98
 
-    # Look for Subtotal / Taxable Value
-    sub_match = re.search(r'(?:subtotal|sub\s+total|taxable\s+value|net\s+amount)[\s/:\n\w\(\)]*[■\$€£₹\s]*([0-9,]+\.\d{2})', raw_text, re.IGNORECASE)
+    # Look for Subtotal / Taxable Value without consuming leading digits
+    sub_match = re.search(r'(?:subtotal|sub\s+total|taxable\s+value|net\s+amount)[^\d\n\r]*?(\d[\d,]*\.\d{2})', raw_text, re.IGNORECASE)
     if sub_match:
         val = float(sub_match.group(1).replace(',', ''))
         extracted["subtotal"] = val
         extracted["field_confidences"]["subtotal"] = 0.96
 
+    # Look for Discount
+    disc_match = re.search(r'(?:discount|special\s+discount|less\s+discount)[^\d\n\r\-]*?[-]?\s*(\d[\d,]*\.\d{2})', raw_text, re.IGNORECASE)
+    if disc_match:
+        val = float(disc_match.group(1).replace(',', ''))
+        extracted["discount"] = val
+        extracted["field_confidences"]["discount"] = 0.94
+
     # Look for Tax: CGST + SGST or GST or VAT or Sales Tax
-    cgst_m = re.search(r'CGST[\s\S]{1,40}?([0-9,]+\.\d{2})', raw_text, re.IGNORECASE)
-    sgst_m = re.search(r'SGST[\s\S]{1,40}?([0-9,]+\.\d{2})', raw_text, re.IGNORECASE)
+    cgst_m = re.search(r'CGST[^\d\n\r]*?(\d[\d,]*\.\d{2})', raw_text, re.IGNORECASE)
+    sgst_m = re.search(r'SGST[^\d\n\r]*?(\d[\d,]*\.\d{2})', raw_text, re.IGNORECASE)
     if cgst_m or sgst_m:
         tax_val = 0.0
         if cgst_m: tax_val += float(cgst_m.group(1).replace(',', ''))
@@ -446,7 +453,7 @@ def parse_text_with_nlp_rules(raw_text: str) -> Dict[str, Any]:
         extracted["tax_amount"] = round(tax_val, 2)
         extracted["field_confidences"]["tax_amount"] = 0.97
     else:
-        tax_match = re.search(r'(?:tax|vat|gst)[\s:$]*([0-9,]+\.\d{2})', raw_text, re.IGNORECASE)
+        tax_match = re.search(r'(?:tax\s+amount|sales\s+tax|total\s+tax|vat|gst|tax)[^\d\n\r]*?(\d[\d,]*\.\d{2})', raw_text, re.IGNORECASE)
         if tax_match:
             val = float(tax_match.group(1).replace(',', ''))
             extracted["tax_amount"] = val
@@ -530,28 +537,13 @@ def process_document(file_path: str, mime_type: str, demo_scenario: str = None) 
     Main entry point for document processing.
     Handles real OCR, PyPDF extraction, or deterministic demo samples.
     """
-    # If explicitly flagged as one of the 3 demo samples:
+    # If explicitly flagged as one of the 3 demo samples by server-controlled parameter:
     if demo_scenario and demo_scenario in DEMO_SAMPLES:
         result = dict(DEMO_SAMPLES[demo_scenario])
         result["extraction_method"] = "DEMO_DETERMINISTIC"
         return result
 
-    # Check if filename indicates a sample
-    fname = os.path.basename(file_path).lower()
-    if "sample1" in fname or "apex" in fname or "clean" in fname:
-        result = dict(DEMO_SAMPLES["clean_valid"])
-        result["extraction_method"] = "DEMO_DETERMINISTIC"
-        return result
-    elif "sample2" in fname or "vanguard" in fname or "error" in fname:
-        result = dict(DEMO_SAMPLES["incorrect_total"])
-        result["extraction_method"] = "DEMO_DETERMINISTIC"
-        return result
-    elif "sample3" in fname or "duplicate" in fname:
-        result = dict(DEMO_SAMPLES["duplicate_invoice"])
-        result["extraction_method"] = "DEMO_DETERMINISTIC"
-        return result
-
-    # Real OCR / PyPDF Extraction
+    # Real OCR / PyPDF Extraction (real user files undergo real extraction)
     raw_text, method = extract_raw_text(file_path, mime_type)
     if raw_text and len(raw_text.strip()) > 30:
         extracted = parse_text_with_nlp_rules(raw_text)

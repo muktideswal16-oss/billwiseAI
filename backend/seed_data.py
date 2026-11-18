@@ -2,9 +2,10 @@ import os
 import datetime
 from sqlalchemy.orm import Session
 from .database import Base, engine, SessionLocal
-from .models import User, Document, ExtractedInvoice, InvoiceItem, ValidationIssue, DuplicateMatch, ApprovalLog
+from .models import User, Document, ExtractedInvoice, InvoiceItem, ValidationIssue, DuplicateMatch, ApprovalLog, UserSettings
 from .ocr_engine import DEMO_SAMPLES
 from .validation_engine import validate_document_data
+from .auth import hash_password
 
 # Ensure uploads directory exists
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads")
@@ -166,11 +167,11 @@ def seed_database():
         print("Seeding BillWise AI database with demo records...")
         s1_file, s2_file, s3_file = write_sample_files()
 
-        # 1. Create Default Demo User
+        # 1. Create Default Demo User with secure bcrypt password
         user = User(
             name="Alex Rivera",
             email="demo@billwise.ai",
-            password_hash="demo1234_hash", # Demo password
+            password_hash=hash_password("demo1234"),
             business_name="Nova Retail Logistics",
             currency="USD",
             role="Finance Director"
@@ -178,6 +179,21 @@ def seed_database():
         db.add(user)
         db.commit()
         db.refresh(user)
+
+        # Create persistent demo UserSettings
+        settings = UserSettings(
+            user_id=user.id,
+            name="Alex Rivera",
+            business_name="Nova Retail Logistics",
+            tax_id="US-EIN-94-2819034",
+            currency="USD",
+            ocr_engine="HYBRID_AI",
+            confidence_threshold=85,
+            auto_validate=True,
+            default_export_format="excel"
+        )
+        db.add(settings)
+        db.commit()
 
         # 2. Add Pre-existing Approved Records for Analytics & Realistic Dashboard
         historical_records = [
@@ -313,7 +329,7 @@ def seed_database():
             confidence_score=s1_data["confidence_score"],
             field_confidences=s1_data["field_confidences"],
             raw_ocr_text=s1_data["raw_ocr_text"],
-            extraction_method="AI_OCR_ENGINE"
+            extraction_method="DEMO_DETERMINISTIC"
         )
         db.add(ext1)
         db.commit()
@@ -321,7 +337,9 @@ def seed_database():
 
         items1 = []
         for item_dict in s1_data["items"]:
-            item = InvoiceItem(invoice_id=ext1.id, **item_dict)
+            clean_item = dict(item_dict)
+            clean_item.setdefault("discount", 0.0)
+            item = InvoiceItem(invoice_id=ext1.id, **clean_item)
             db.add(item)
             items1.append(item)
         db.commit()
@@ -369,7 +387,7 @@ def seed_database():
             confidence_score=s2_data["confidence_score"],
             field_confidences=s2_data["field_confidences"],
             raw_ocr_text=s2_data["raw_ocr_text"],
-            extraction_method="AI_OCR_ENGINE"
+            extraction_method="DEMO_DETERMINISTIC"
         )
         db.add(ext2)
         db.commit()
@@ -377,7 +395,9 @@ def seed_database():
 
         items2 = []
         for item_dict in s2_data["items"]:
-            item = InvoiceItem(invoice_id=ext2.id, **item_dict)
+            clean_item = dict(item_dict)
+            clean_item.setdefault("discount", 0.0)
+            item = InvoiceItem(invoice_id=ext2.id, **clean_item)
             db.add(item)
             items2.append(item)
         db.commit()
@@ -425,7 +445,7 @@ def seed_database():
             confidence_score=s3_data["confidence_score"],
             field_confidences=s3_data["field_confidences"],
             raw_ocr_text=s3_data["raw_ocr_text"],
-            extraction_method="AI_OCR_ENGINE"
+            extraction_method="DEMO_DETERMINISTIC"
         )
         db.add(ext3)
         db.commit()
@@ -433,7 +453,9 @@ def seed_database():
 
         items3 = []
         for item_dict in s3_data["items"]:
-            item = InvoiceItem(invoice_id=ext3.id, **item_dict)
+            clean_item = dict(item_dict)
+            clean_item.setdefault("discount", 0.0)
+            item = InvoiceItem(invoice_id=ext3.id, **clean_item)
             db.add(item)
             items3.append(item)
         db.commit()

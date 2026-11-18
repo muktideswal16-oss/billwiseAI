@@ -26,6 +26,10 @@ export default function AuthPage({ initialMode = 'login' }) {
       addToast('Please enter both email and password', 'warning');
       return;
     }
+    if (!isLogin && password.length < 8) {
+      addToast('Password must be at least 8 characters long for security compliance.', 'error');
+      return;
+    }
     setLoading(true);
     try {
       if (isLogin) {

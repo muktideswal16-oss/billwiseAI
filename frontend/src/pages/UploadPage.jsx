@@ -59,13 +59,13 @@ export default function UploadPage() {
   };
 
   const handleFileSelected = (file) => {
-    const validTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml'];
-    if (!validTypes.includes(file.type) && !file.name.match(/\.(pdf|png|jpe?g|svg)$/i)) {
-      addToast('Invalid file format. Please upload PDF, PNG, JPG, or JPEG.', 'error');
+    const validTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg'];
+    if (!validTypes.includes(file.type) && !file.name.match(/\.(pdf|png|jpe?g)$/i)) {
+      addToast('Invalid file format. Only PDF, PNG, JPG, and JPEG are supported for secure processing.', 'error');
       return;
     }
     if (file.size > 15 * 1024 * 1024) {
-      addToast('File exceeds 15MB limit.', 'error');
+      addToast('File exceeds maximum upload limit of 15 MB.', 'error');
       return;
     }
     setSelectedFile(file);
@@ -229,7 +229,7 @@ export default function UploadPage() {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".pdf,.png,.jpg,.jpeg,.svg"
+            accept=".pdf,.png,.jpg,.jpeg"
             className="hidden"
             onChange={(e) => {
               if (e.target.files && e.target.files[0]) {

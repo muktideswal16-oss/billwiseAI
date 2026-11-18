@@ -18,6 +18,7 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     documents = relationship("Document", back_populates="user", cascade="all, delete-orphan")
+    settings = relationship("UserSettings", back_populates="user", uselist=False, cascade="all, delete-orphan")
 
 
 class Document(Base):
@@ -159,4 +160,23 @@ class AuditLog(Base):
     entity_id = Column(Integer, nullable=True)
     details = Column(JSON, default=dict)
     timestamp = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class UserSettings(Base):
+    __tablename__ = "user_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
+    name = Column(String(120), default="Alex Rivera")
+    business_name = Column(String(200), default="Nova Retail Logistics")
+    tax_id = Column(String(100), default="US-EIN-94-2819034")
+    currency = Column(String(10), default="USD")
+    ocr_engine = Column(String(50), default="HYBRID_AI")
+    confidence_threshold = Column(Integer, default=85)
+    auto_validate = Column(Boolean, default=True)
+    default_export_format = Column(String(20), default="excel")
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User", back_populates="settings")
+
 

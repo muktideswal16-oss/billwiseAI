@@ -1,5 +1,5 @@
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 import datetime
 
 # ----------------- User Schemas -----------------
@@ -12,6 +12,13 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: str
+
+    @field_validator("password")
+    @classmethod
+    def password_min_length(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        return v
 
 class UserLogin(BaseModel):
     email: str
@@ -201,4 +208,36 @@ class AnalyticsOverviewResponse(BaseModel):
     spending_by_vendor: List[Dict[str, Any]]
     status_distribution: List[Dict[str, Any]]
     type_distribution: List[Dict[str, Any]]
+
+# ----------------- Settings Schemas -----------------
+class UserSettingsBase(BaseModel):
+    name: Optional[str] = "Alex Rivera"
+    email: Optional[str] = None
+    business_name: Optional[str] = "Nova Retail Logistics"
+    tax_id: Optional[str] = "US-EIN-94-2819034"
+    currency: Optional[str] = "USD"
+    ocr_engine: Optional[str] = "HYBRID_AI"
+    confidence_threshold: Optional[int] = 85
+    auto_validate: Optional[bool] = True
+    default_export_format: Optional[str] = "excel"
+
+class UserSettingsUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+    business_name: Optional[str] = None
+    tax_id: Optional[str] = None
+    currency: Optional[str] = None
+    ocr_engine: Optional[str] = None
+    confidence_threshold: Optional[int] = None
+    auto_validate: Optional[bool] = None
+    default_export_format: Optional[str] = None
+
+class UserSettingsResponse(UserSettingsBase):
+    id: int
+    user_id: int
+    updated_at: Optional[datetime.datetime] = None
+
+    class Config:
+        from_attributes = True
+
 

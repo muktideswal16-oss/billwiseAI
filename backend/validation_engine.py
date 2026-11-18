@@ -1,9 +1,21 @@
 import datetime
+from decimal import Decimal, ROUND_HALF_UP
 from typing import List, Dict, Any, Tuple
 from sqlalchemy.orm import Session
 from .models import Document, ExtractedInvoice, InvoiceItem, ValidationIssue, DuplicateMatch
 
-TOLERANCE = 0.05
+TOLERANCE = Decimal("0.05")
+
+
+def to_decimal(val) -> Decimal:
+    """Safely converts a number, float, or string to a 2-decimal place Decimal."""
+    if val is None:
+        return Decimal("0.00")
+    try:
+        return Decimal(str(val)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    except Exception:
+        return Decimal("0.00")
+
 
 def validate_document_data(
     db: Session,
@@ -12,11 +24,11 @@ def validate_document_data(
     items: List[InvoiceItem]
 ) -> Dict[str, Any]:
     """
-    Performs comprehensive rule-based validation on an extracted invoice:
-    1. Arithmetic Integrity (Totals & Line Items)
+    Performs comprehensive rule-based financial validation on an extracted invoice:
+    1. Arithmetic Integrity (Totals & Line Items using Decimal arithmetic)
     2. Missing Mandatory Fields
     3. Date & Timeline Sanity
-    4. Duplicate Detection
+    4. Duplicate Detection (honoring legitimate resolutions & user isolation)
     5. Data Consistency & Currency Checks
 
     Returns summary: {
@@ -81,7 +93,8 @@ def validate_document_data(
     else:
         checks_passed.append(f"Invoice issue date verified: {extracted_data.invoice_date}")
 
-    if extracted_data.grand_total is None or extracted_data.grand_total <= 0:
+    grand_total_dec = to_decimal(extracted_data.grand_total)
+    if grand_total_dec <= Decimal("0.00"):
         issues.append(ValidationIssue(
             document_id=document.id,
             category="missing_field",
@@ -90,59 +103,67 @@ def validate_document_data(
             severity="error",
             field_name="grand_total",
             expected_value="> 0.00",
-            actual_value=f"{extracted_data.grand_total:.2f}" if extracted_data.grand_total else "0.00"
+            actual_value=f"{grand_total_dec:.2f}"
         ))
     else:
-        checks_passed.append(f"Grand total present: {extracted_data.currency} {extracted_data.grand_total:,.2f}")
+        checks_passed.append(f"Grand total present: {extracted_data.currency} {grand_total_dec:,.2f}")
 
-    # ---------------- 2. MATHEMATICAL CALCULATION CHECKS ----------------
+    # ---------------- 2. MATHEMATICAL CALCULATION CHECKS (DECIMAL) ----------------
+    subtotal_dec = to_decimal(extracted_data.subtotal)
+    tax_dec = to_decimal(extracted_data.tax_amount)
+    discount_dec = to_decimal(extracted_data.discount)
+
     # A. Subtotal + Tax - Discount == Grand Total
-    expected_grand_total = round(extracted_data.subtotal + extracted_data.tax_amount - extracted_data.discount, 2)
-    diff = abs(expected_grand_total - extracted_data.grand_total)
+    expected_grand_total_dec = subtotal_dec + tax_dec - discount_dec
+    diff_total = abs(expected_grand_total_dec - grand_total_dec)
 
-    if diff > TOLERANCE:
+    if diff_total > TOLERANCE:
         issues.append(ValidationIssue(
             document_id=document.id,
             category="calculation",
             issue_type="Grand Total Discrepancy",
             issue_description=(
-                f"Formula mismatch: Subtotal ({extracted_data.subtotal:,.2f}) + "
-                f"Tax ({extracted_data.tax_amount:,.2f}) - Discount ({extracted_data.discount:,.2f}) = "
-                f"{expected_grand_total:,.2f}, but Grand Total is {extracted_data.grand_total:,.2f}."
+                f"Formula mismatch: Subtotal ({subtotal_dec:,.2f}) + "
+                f"Tax ({tax_dec:,.2f}) - Discount ({discount_dec:,.2f}) = "
+                f"{expected_grand_total_dec:,.2f}, but Grand Total is {grand_total_dec:,.2f}."
             ),
             severity="error",
             field_name="grand_total",
-            expected_value=f"{expected_grand_total:.2f}",
-            actual_value=f"{extracted_data.grand_total:.2f}"
+            expected_value=f"{expected_grand_total_dec:.2f}",
+            actual_value=f"{grand_total_dec:.2f}"
         ))
     else:
         checks_passed.append("Grand total matches financial formula (Subtotal + Tax - Discount)")
 
     # B. Line items sum vs Subtotal
     if items:
-        sum_line_totals = round(sum(item.line_total for item in items), 2)
-        if abs(sum_line_totals - extracted_data.subtotal) > TOLERANCE:
+        sum_line_totals_dec = sum((to_decimal(it.line_total) for it in items), Decimal("0.00"))
+        if abs(sum_line_totals_dec - subtotal_dec) > TOLERANCE:
             issues.append(ValidationIssue(
                 document_id=document.id,
                 category="calculation",
                 issue_type="Line Item Sum vs Subtotal Mismatch",
                 issue_description=(
-                    f"The sum of all line items ({sum_line_totals:,.2f}) does not match "
-                    f"the declared invoice subtotal ({extracted_data.subtotal:,.2f}). Difference: {abs(sum_line_totals - extracted_data.subtotal):,.2f}."
+                    f"The sum of all line items ({sum_line_totals_dec:,.2f}) does not match "
+                    f"the declared invoice subtotal ({subtotal_dec:,.2f}). Difference: {abs(sum_line_totals_dec - subtotal_dec):,.2f}."
                 ),
                 severity="warning",
                 field_name="subtotal",
-                expected_value=f"{sum_line_totals:.2f}",
-                actual_value=f"{extracted_data.subtotal:.2f}"
+                expected_value=f"{sum_line_totals_dec:.2f}",
+                actual_value=f"{subtotal_dec:.2f}"
             ))
         else:
-            checks_passed.append(f"All {len(items)} line items sum perfectly to Subtotal ({extracted_data.subtotal:,.2f})")
+            checks_passed.append(f"All {len(items)} line items sum perfectly to Subtotal ({subtotal_dec:,.2f})")
 
         # C. Individual line item quantity * unit_price - discount == line_total
         for idx, item in enumerate(items, 1):
-            item_disc = getattr(item, 'discount', 0.0) or 0.0
-            expected_line = round(item.quantity * item.unit_price - item_disc, 2)
-            if abs(expected_line - item.line_total) > TOLERANCE:
+            q_dec = to_decimal(item.quantity)
+            p_dec = to_decimal(item.unit_price)
+            d_dec = to_decimal(getattr(item, 'discount', 0.0) or 0.0)
+            lt_dec = to_decimal(item.line_total)
+
+            expected_line_dec = (q_dec * p_dec - d_dec).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            if abs(expected_line_dec - lt_dec) > TOLERANCE:
                 issues.append(ValidationIssue(
                     document_id=document.id,
                     category="calculation",
@@ -150,14 +171,14 @@ def validate_document_data(
                     item_index=idx,
                     item_name=item.item_name,
                     issue_description=(
-                        f"Item #{idx} '{item.item_name}': Qty ({item.quantity}) × Unit Price ({item.unit_price:,.2f})"
-                        + (f" - Discount ({item_disc:,.2f})" if item_disc > 0 else "")
-                        + f" = {expected_line:,.2f}, but line total is listed as {item.line_total:,.2f}."
+                        f"Item #{idx} '{item.item_name}': Qty ({q_dec}) × Unit Price ({p_dec:,.2f})"
+                        + (f" - Discount ({d_dec:,.2f})" if d_dec > Decimal("0.00") else "")
+                        + f" = {expected_line_dec:,.2f}, but line total is listed as {lt_dec:,.2f}."
                     ),
                     severity="warning",
                     field_name=f"item_{idx}_line_total",
-                    expected_value=f"{expected_line:.2f}",
-                    actual_value=f"{item.line_total:.2f}"
+                    expected_value=f"{expected_line_dec:.2f}",
+                    actual_value=f"{lt_dec:.2f}"
                 ))
 
     # ---------------- 3. DATE SANITY CHECKS ----------------
@@ -196,12 +217,13 @@ def validate_document_data(
 
     if inv_dt:
         today = datetime.date.today()
-        if (inv_dt - today).days > 31:
+        # Allow reasonable future billing up to 60 days
+        if (inv_dt - today).days > 60:
             issues.append(ValidationIssue(
                 document_id=document.id,
                 category="date",
                 issue_type="Suspicious Future Invoice Date",
-                issue_description=f"Invoice date {inv_dt.isoformat()} is more than 30 days into the future.",
+                issue_description=f"Invoice date {inv_dt.isoformat()} is more than 60 days into the future.",
                 severity="warning",
                 field_name="invoice_date",
                 expected_value=f"<= {today.isoformat()}",
@@ -269,29 +291,44 @@ def check_duplicates_for_document(
     extracted_data: ExtractedInvoice
 ) -> List[Dict[str, Any]]:
     """
-    Scans the database for duplicate candidates based on:
-    - Same Invoice Number + Same Vendor Name (100% Match)
-    - Same Vendor Name + Same Date + Same Grand Total (90% Match)
-    - Same Invoice Number across different vendors (75% Match)
+    Scans the database for duplicate candidates:
+    - Restricts search to the current user's documents (user data isolation)
+    - Skips matches already resolved as marked_legitimate
+    - Compares Invoice Number + Vendor, Date, and Amount
     """
     duplicates = []
-    
-    # Query all other documents with extracted data
-    other_docs = db.query(Document).filter(
+
+    # Isolation query: compare only within the permitted dataset (same user or unassigned)
+    query = db.query(Document).filter(
         Document.id != document.id,
         Document.processing_status != "error"
-    ).all()
+    )
+
+    if document.user_id is not None:
+        query = query.filter(Document.user_id == document.user_id)
+
+    other_docs = query.all()
 
     for other in other_docs:
         other_ext = other.extracted_data
         if not other_ext:
             continue
 
+        # Check existing match resolution status
+        existing_match = db.query(DuplicateMatch).filter(
+            DuplicateMatch.document_id == document.id,
+            DuplicateMatch.matched_document_id == other.id
+        ).first()
+
+        # If already marked legitimate by human reviewer, do not recreate warning!
+        if existing_match and existing_match.status in ["marked_legitimate", "mark_legitimate"]:
+            continue
+
         reasons = []
         score = 0.0
 
         # Exact Invoice Number Match
-        same_inv_num = (
+        same_inv_num = bool(
             extracted_data.invoice_number and
             other_ext.invoice_number and
             extracted_data.invoice_number.strip().lower() == other_ext.invoice_number.strip().lower()
@@ -302,17 +339,16 @@ def check_duplicates_for_document(
         if extracted_data.vendor_name and other_ext.vendor_name:
             v1 = extracted_data.vendor_name.strip().lower()
             v2 = other_ext.vendor_name.strip().lower()
-            if v1 == v2 or v1 in v2 or v2 in v1:
+            if v1 == v2 or (len(v1) > 4 and len(v2) > 4 and (v1 in v2 or v2 in v1)):
                 same_vendor = True
 
-        # Same Amount
-        same_amount = (
-            abs(extracted_data.grand_total - other_ext.grand_total) <= TOLERANCE and
-            extracted_data.grand_total > 0
-        )
+        # Same Amount (using decimal precision)
+        amt1 = to_decimal(extracted_data.grand_total)
+        amt2 = to_decimal(other_ext.grand_total)
+        same_amount = bool(abs(amt1 - amt2) <= TOLERANCE and amt1 > Decimal("0.00"))
 
         # Same Date
-        same_date = (
+        same_date = bool(
             extracted_data.invoice_date and
             other_ext.invoice_date and
             extracted_data.invoice_date == other_ext.invoice_date
@@ -323,15 +359,16 @@ def check_duplicates_for_document(
             reasons.append(f"Identical Invoice Number '{extracted_data.invoice_number}'")
             reasons.append(f"Identical Vendor '{extracted_data.vendor_name}'")
             if same_amount:
-                reasons.append(f"Identical Grand Total (${extracted_data.grand_total:,.2f})")
+                reasons.append(f"Identical Grand Total (${amt1:,.2f})")
             if same_date:
                 reasons.append(f"Identical Invoice Date ({extracted_data.invoice_date})")
         elif same_vendor and same_amount and same_date:
             score = 90.0
             reasons.append(f"Same Vendor '{extracted_data.vendor_name}'")
             reasons.append(f"Same Billing Date ({extracted_data.invoice_date})")
-            reasons.append(f"Identical Grand Total (${extracted_data.grand_total:,.2f})")
-        elif same_inv_num:
+            reasons.append(f"Identical Grand Total (${amt1:,.2f})")
+        elif same_inv_num and not (document.is_demo_sample and other.is_demo_sample and document.demo_scenario != "duplicate_invoice"):
+            # Avoid matching sample 1 against sample 1 when loading fresh demo
             score = 75.0
             reasons.append(f"Matching Invoice Number '{extracted_data.invoice_number}' (Different or unverified vendor)")
 
@@ -341,12 +378,6 @@ def check_duplicates_for_document(
                 "score": score,
                 "reasons": reasons
             })
-
-            # Check if DuplicateMatch record already exists
-            existing_match = db.query(DuplicateMatch).filter(
-                DuplicateMatch.document_id == document.id,
-                DuplicateMatch.matched_document_id == other.id
-            ).first()
 
             if not existing_match:
                 match_record = DuplicateMatch(
@@ -360,4 +391,3 @@ def check_duplicates_for_document(
 
     db.commit()
     return duplicates
-

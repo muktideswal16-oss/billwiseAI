@@ -47,3 +47,19 @@ Desktop.ini
 backend/uploads/*
 !backend/uploads/samples/
 !backend/uploads/samples/**
+# Deployment exclusions
+**/node_modules/
+**/__pycache__/
+*.py[cod]
+.env
+.env.*
+!.env.example
+*.db
+*.sqlite
+*.sqlite3
+**/dist/
+**/build/
+.vite/
+backend/uploads/*
+!backend/uploads/.gitkeep
+

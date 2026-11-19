@@ -112,11 +112,10 @@ export default function ExportPage() {
           {/* Format selection */}
           <div
             onClick={() => setFormat('excel')}
-            className={`p-5 rounded-xl border cursor-pointer transition-all flex items-start gap-3.5 ${
-              format === 'excel'
+            className={`p-5 rounded-xl border cursor-pointer transition-all flex items-start gap-3.5 ${format === 'excel'
                 ? 'bg-[#18231E] border-[#20D69A] shadow-[0_0_20px_rgba(32,214,154,0.15)]'
                 : 'bg-[#101613] border-[#1D2B24] hover:border-[#20D69A]/40'
-            }`}
+              }`}
           >
             <div className="w-10 h-10 rounded-xl bg-[#20D69A]/15 text-[#20D69A] flex items-center justify-center shrink-0">
               <FileSpreadsheet className="w-6 h-6" />
@@ -138,11 +137,10 @@ export default function ExportPage() {
 
           <div
             onClick={() => setFormat('csv')}
-            className={`p-5 rounded-xl border cursor-pointer transition-all flex items-start gap-3.5 ${
-              format === 'csv'
+            className={`p-5 rounded-xl border cursor-pointer transition-all flex items-start gap-3.5 ${format === 'csv'
                 ? 'bg-[#18231E] border-[#20D69A] shadow-[0_0_20px_rgba(32,214,154,0.15)]'
                 : 'bg-[#101613] border-[#1D2B24] hover:border-[#20D69A]/40'
-            }`}
+              }`}
           >
             <div className="w-10 h-10 rounded-xl bg-[#8AF0C7]/15 text-[#8AF0C7] flex items-center justify-center shrink-0">
               <FileText className="w-6 h-6" />
@@ -216,9 +214,8 @@ export default function ExportPage() {
                   <tr
                     key={doc.id}
                     onClick={() => handleToggleDoc(doc.id)}
-                    className={`cursor-pointer transition-colors ${
-                      isSelected ? 'bg-[#18231E]/60' : 'hover:bg-[#101613]'
-                    }`}
+                    className={`cursor-pointer transition-colors ${isSelected ? 'bg-[#18231E]/60' : 'hover:bg-[#101613]'
+                      }`}
                   >
                     <td className="py-2.5 px-4" onClick={(e) => e.stopPropagation()}>
                       <input
